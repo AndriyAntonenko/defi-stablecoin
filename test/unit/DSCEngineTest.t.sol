@@ -24,6 +24,7 @@ contract DSCEngineTest is Test {
   address public immutable USER = makeAddr("user");
   uint256 public constant AMOUNT_COLLATERAL = 2 ether;
   uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
+  uint256 public constant AMOUNT_MINT = 100e18;
 
   function setUp() public {
     deployer = new DeployDSC();
@@ -80,5 +81,36 @@ contract DSCEngineTest is Test {
     uint256 callateralValueInUsd = engine.getAccountCallateralValueInUsd(USER);
     uint256 expectedCallateralValueInUsd = engine.getUsdValue(weth, AMOUNT_COLLATERAL);
     assertEq(callateralValueInUsd, expectedCallateralValueInUsd);
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                        MINT DSC TESTS
+  //////////////////////////////////////////////////////////////*/
+  function testRevertIfMintAmountZero() public {
+    vm.startPrank(USER);
+    vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+    engine.mintDsc(0);
+    vm.stopPrank();
+  }
+
+  function testRevertMintIfHealthFactorIsBroken() public {
+    vm.startPrank(USER);
+    vm.expectRevert(DSCEngine.DSCEngine__BreaksHealthFactor.selector);
+    engine.mintDsc(AMOUNT_MINT);
+    vm.stopPrank();
+  }
+
+  function testSuccessfullMint() public {
+    vm.startPrank(USER);
+    ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
+    engine.depositCollateral(weth, AMOUNT_COLLATERAL);
+    vm.stopPrank();
+
+    vm.startPrank(USER);
+    engine.mintDsc(AMOUNT_MINT);
+    vm.stopPrank();
+
+    uint256 dscBalance = dsc.balanceOf(USER);
+    assertEq(dscBalance, AMOUNT_MINT);
   }
 }
