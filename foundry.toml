@@ -1,6 +1,20 @@
 [profile.default]
 src = 'src'
 out = 'out'
+script = 'script'
 libs = ['lib']
+solc = "0.8.19"
+remappings = ["@openzeppelin/=lib/openzeppelin-contracts/", "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/"]
+
+[fmt]
+bracket_spacing = true
+int_types = "long"
+line_length = 120
+multiline_func_header = "all"
+number_underscore = "thousands"
+quote_style = "double"
+tab_width = 2
+wrap_comments = true
+
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
