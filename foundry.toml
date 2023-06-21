@@ -17,4 +17,9 @@ tab_width = 2
 wrap_comments = true
 
 
+[invariant]
+runs = 128
+depth = 128
+fail_on_revert = true
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

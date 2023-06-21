@@ -309,6 +309,13 @@ contract DSCEngine is ReentrancyGuard {
     }
   }
 
+  function _calculateMaxMintableDsc(address _user) internal view returns (uint256) {
+    (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInfo(_user);
+    uint256 maxMintableDsc = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+    uint256 mintableDsc = maxMintableDsc - totalDscMinted;
+    return mintableDsc;
+  }
+
   /*//////////////////////////////////////////////////////////////
                   PUBLIC & EXTERNAL VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
@@ -366,5 +373,28 @@ contract DSCEngine is ReentrancyGuard {
     bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
     // get total collateral to redeem
     totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+  }
+
+  function estimateAccountMaxMintableDsc(address _user) external view returns (uint256) {
+    return _calculateMaxMintableDsc(_user);
+  }
+
+  function estimateAccountOverheadCollateral(address _user, address _collateralToken) external view returns (uint256) {
+    uint256 usdCollateralOverhead = _calculateMaxMintableDsc(_user) * LIQUIDATION_PRECISION / LIQUIDATION_THRESHOLD;
+    uint256 _overheadInCollateralTokenValue = getTokenAmountFromUsd(_collateralToken, usdCollateralOverhead);
+
+    uint256 _currentCollateralTokenAmount = s_callateralDeposited[_user][_collateralToken];
+    if (_overheadInCollateralTokenValue > _currentCollateralTokenAmount) {
+      return _currentCollateralTokenAmount;
+    }
+    return _overheadInCollateralTokenValue;
+  }
+
+  function getCollateralTokens() external view returns (address[] memory) {
+    return s_callateralTokens;
+  }
+
+  function getCollateralPriceFeed(address _collateralToken) external view returns (address) {
+    return s_priceFeeds[_collateralToken];
   }
 }
