@@ -23,9 +23,11 @@ contract DSCEngineTest is Test {
   address ethUsdPriceFeed;
   address btcUsdPriceFeed;
   address weth;
+  address wbtc;
 
   address public immutable USER = makeAddr("user");
   address public immutable LIQUIDATOR = makeAddr("liquidator");
+  address public immutable GETTERS_TESTER = makeAddr("getters-tester");
 
   uint256 public constant AMOUNT_COLLATERAL = 10 ether;
   uint256 public constant AMOUNT_TO_COVER = 20 ether;
@@ -38,7 +40,7 @@ contract DSCEngineTest is Test {
   function setUp() public {
     deployer = new DeployDSC();
     (dsc, engine, config) = deployer.run();
-    (ethUsdPriceFeed, btcUsdPriceFeed, weth,,) = config.activeNetworkConfig();
+    (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc,) = config.activeNetworkConfig();
     ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
   }
 
@@ -81,26 +83,34 @@ contract DSCEngineTest is Test {
                              PRICE TESTS
   //////////////////////////////////////////////////////////////*/
 
-  // @TODO: make it agnostic
   function testGetUsdValue() public {
     uint256 ethAmount = 15e18;
-    uint256 expectedUsd = 30_000e18;
+    uint256 expectedUsdUncorrected = ethAmount * uint256(MockV3Aggregator(ethUsdPriceFeed).latestAnswer());
+    uint256 expectedUsd = (expectedUsdUncorrected * engine.getAdditionalFeedPrecision()) / engine.getPresicion();
     uint256 actualUsd = engine.getUsdValue(weth, ethAmount);
     assertEq(actualUsd, expectedUsd);
   }
 
-  // @TODO: make it agnostic
   function testGetTokenAmountFromUsd() public {
-    uint256 usdAmount = 100e18;
+    uint256 usdAmountInWei = 100e18;
     // assume that price = 2000$ for 1 ETH (check helper config)
-    uint256 expectedWeth = 5e16;
-    uint256 actualWeth = engine.getTokenAmountFromUsd(weth, usdAmount);
+    uint256 expectedWeth = (engine.getPresicion() * usdAmountInWei)
+      / (uint256(MockV3Aggregator(ethUsdPriceFeed).latestAnswer()) * engine.getAdditionalFeedPrecision());
+    uint256 actualWeth = engine.getTokenAmountFromUsd(weth, usdAmountInWei);
     assertEq(actualWeth, expectedWeth);
   }
 
   /*//////////////////////////////////////////////////////////////
                         DEPOSIT COLLATERAL TESTS
   //////////////////////////////////////////////////////////////*/
+  modifier deposited() {
+    vm.startPrank(USER);
+    ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
+    engine.depositCollateral(weth, AMOUNT_COLLATERAL);
+    vm.stopPrank();
+    _;
+  }
+
   function testRevertIfCollateralZero() public {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
@@ -126,12 +136,7 @@ contract DSCEngineTest is Test {
     vm.stopPrank();
   }
 
-  function testCollateralValueInUsdIsCorrect() public {
-    vm.startPrank(USER);
-    ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
-    engine.depositCollateral(weth, AMOUNT_COLLATERAL);
-    vm.stopPrank();
-
+  function testCollateralValueInUsdIsCorrect() public deposited {
     uint256 callateralValueInUsd = engine.getAccountCallateralValueInUsd(USER);
     uint256 expectedCallateralValueInUsd = engine.getUsdValue(weth, AMOUNT_COLLATERAL);
     assertEq(callateralValueInUsd, expectedCallateralValueInUsd);
@@ -181,6 +186,22 @@ contract DSCEngineTest is Test {
     engine.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_MINT);
     vm.stopPrank();
     _verifyDepositAndMintResult();
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                            ESTIMATIONS
+  //////////////////////////////////////////////////////////////*/
+  function testEstimateCollateralOverhead() public deposited {
+    uint256 estimatedOvercallteral = engine.estimateAccountOverheadCollateral(USER, weth);
+    assertEq(estimatedOvercallteral, AMOUNT_COLLATERAL);
+  }
+
+  function testEstimateMaxMintable() public deposited {
+    uint256 collateralValueInUsd = engine.getUsdValue(weth, AMOUNT_COLLATERAL);
+    assertEq(
+      (collateralValueInUsd * engine.getLiquidationThreshold()) / engine.getLiquidationPrecision(),
+      engine.estimateAccountMaxMintableDsc(USER)
+    );
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -312,5 +333,21 @@ contract DSCEngineTest is Test {
     uint256 liquidatorWeth = ERC20Mock(weth).balanceOf(LIQUIDATOR);
     (,, uint256 totalCollateralToRedeem) = engine.estimateLiquidationProfit(weth, AMOUNT_MINT);
     assertEq(liquidatorWeth, totalCollateralToRedeem);
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                        GETTERS FUNCTIONS
+  //////////////////////////////////////////////////////////////*/
+
+  function testGetCollateralTokens() public {
+    address[] memory collateralTokens = engine.getCollateralTokens();
+    assertEq(collateralTokens.length, 2);
+    assertEq(collateralTokens[0], weth);
+    assertEq(collateralTokens[1], wbtc);
+  }
+
+  function testGetCollateralPriceFeed() public {
+    address receivedWethFeed = engine.getCollateralPriceFeed(weth);
+    assertEq(receivedWethFeed, ethUsdPriceFeed);
   }
 }

@@ -50,7 +50,7 @@ contract DSCEngine is ReentrancyGuard {
   uint256 private constant PRECISION = 1e18;
 
   // LIQUIDATION CONDITION: collateral < dscAmount * LIQUIDATION_PRECISION / LIQUIDATION_THRESHOLD
-  uint256 private constant LIQUIDATION_THRESHOLD = 50; // 150% overcollateralized
+  uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
   uint256 private constant LIQUIDATION_PRECISION = 100;
 
   uint256 private constant MIN_HEALTH_FACTOR = 1e18;
@@ -402,5 +402,21 @@ contract DSCEngine is ReentrancyGuard {
 
   function getCollateralPriceFeed(address _collateralToken) external view returns (address) {
     return s_priceFeeds[_collateralToken];
+  }
+
+  function getLiquidationThreshold() external pure returns (uint256) {
+    return LIQUIDATION_THRESHOLD;
+  }
+
+  function getLiquidationPrecision() external pure returns (uint256) {
+    return LIQUIDATION_PRECISION;
+  }
+
+  function getPresicion() external pure returns (uint256) {
+    return PRECISION;
+  }
+
+  function getAdditionalFeedPrecision() external pure returns (uint256) {
+    return ADDITIONAL_FEED_PRECISION;
   }
 }
