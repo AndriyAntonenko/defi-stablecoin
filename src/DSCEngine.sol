@@ -415,6 +415,57 @@ contract DSCEngine is ReentrancyGuard {
     return _overheadInCollateralTokenValue;
   }
 
+  /**
+   * This function helps to estimate liquidation price for collateral token
+   * @notice if user's health factor is less than 1, then estimate returns 0
+   * @notice in case, if liquidation price is 0, then user can't be liquidated
+   * @param _collateral collateral token address
+   * @param _user depositor
+   */
+  function estimateLiquidationPriceForCollateralToken(
+    address _collateral,
+    address _user
+  )
+    external
+    view
+    returns (int256)
+  {
+    uint256 userHealthFactor = _healthFactor(_user);
+    if (userHealthFactor < MIN_HEALTH_FACTOR) {
+      return 0;
+    }
+    // reversed health factor coef: LIQUIDATION_PRECISION / LIQUIDATION_THRESHOLD. It's 2
+    // HF = minHF - 1
+    // HF = usdCollateral / (2 * dscMinted)
+    // usdCollateral = sum(t1*p1 + t2*p2 + ... + tn*pn)
+    // HF = sum(t1*p1 + t2*p2 + ... + tn*pn) / (2 * dscMinted)
+    // pn = (2 * HF * dscMinted - t1 * p1 - t2 * p2 - ... - tn-1 * pn-1) / tn
+
+    uint256 currentCollateralDeposited = s_callateralDeposited[_user][_collateral];
+    if (currentCollateralDeposited == 0) {
+      return 0;
+    }
+
+    uint256 restCollateralValueInUsd = 0;
+    for (uint256 i = 0; i < s_callateralTokens.length; i++) {
+      address token = s_callateralTokens[i];
+      if (token == _collateral) {
+        continue;
+      }
+      uint256 amount = s_callateralDeposited[_user][token];
+      restCollateralValueInUsd += getUsdValue(token, amount);
+    }
+
+    uint256 totalDscMinted = s_dscMinted[_user];
+
+    uint256 estimate = LIQUIDATION_PRECISION * (MIN_HEALTH_FACTOR - 1) * totalDscMinted;
+    estimate = estimate / (LIQUIDATION_THRESHOLD);
+    estimate = estimate - restCollateralValueInUsd * PRECISION;
+    estimate = estimate / (currentCollateralDeposited * ADDITIONAL_FEED_PRECISION);
+
+    return int256(estimate);
+  }
+
   function getCollateralTokens() external view returns (address[] memory) {
     return s_callateralTokens;
   }

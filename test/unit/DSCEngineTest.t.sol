@@ -35,7 +35,6 @@ contract DSCEngineTest is Test {
   uint256 public constant AMOUNT_MINT = 100 ether;
   uint256 public constant BURN_AMOUNT = 50 ether;
   uint256 public constant REDEEM_COLLATERAL = 0.01 ether;
-  int256 public constant LIQUIDATION_PRICE = 15e8;
 
   function setUp() public {
     deployer = new DeployDSC();
@@ -316,7 +315,7 @@ contract DSCEngineTest is Test {
     engine.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_MINT);
     vm.stopPrank();
 
-    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(LIQUIDATION_PRICE);
+    MockV3Aggregator(ethUsdPriceFeed).updateAnswer(engine.estimateLiquidationPriceForCollateralToken(weth, USER));
 
     ERC20Mock(weth).mint(LIQUIDATOR, AMOUNT_TO_COVER);
 
