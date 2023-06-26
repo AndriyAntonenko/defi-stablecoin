@@ -71,6 +71,15 @@ contract DSCEngine is ReentrancyGuard {
   event CollateralRedeemed(
     address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
   );
+  event Liquidated(
+    address indexed liquidator,
+    address indexed liquidated,
+    address indexed collateralToken,
+    uint256 redeemed,
+    uint256 burned,
+    uint256 initialHealthFactor,
+    uint256 finalHealthFactor
+  );
 
   /*//////////////////////////////////////////////////////////////
                                  MODIFIERS
@@ -240,6 +249,16 @@ contract DSCEngine is ReentrancyGuard {
       revert DSCEngine__HealthFactorNotImproved();
     }
     _revertIfHealthFactorIsBroken(msg.sender);
+
+    emit Liquidated(
+      msg.sender,
+      _user,
+      _collateral,
+      totalCollateralToRedeem,
+      _debtToCover,
+      startingUserHealthFactor,
+      endingUserHealthFactor
+      );
   }
 
   /*//////////////////////////////////////////////////////////////
