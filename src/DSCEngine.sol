@@ -37,6 +37,7 @@ contract DSCEngine is ReentrancyGuard {
   error DSCEngine__MintFailed();
   error DSCEngine__HealthFactorOk();
   error DSCEngine__HealthFactorNotImproved();
+  error DSCEngine__InvalidOracle();
 
   /*//////////////////////////////////////////////////////////////
                                  TYPES
@@ -121,6 +122,12 @@ contract DSCEngine is ReentrancyGuard {
       if (tokenAddresses[i] == address(0) || priceFeedAddresses[i] == address(0)) {
         revert DSCEngine__ZeroAddress();
       }
+
+      bool isOracleValid = AggregatorV3Interface(priceFeedAddresses[i]).validateOracle();
+      if (!isOracleValid) {
+        revert DSCEngine__InvalidOracle();
+      }
+
       s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
       s_callateralTokens.push(tokenAddresses[i]);
     }
