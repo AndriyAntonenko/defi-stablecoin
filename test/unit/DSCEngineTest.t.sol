@@ -10,12 +10,12 @@ import { ERC20Mock } from "../mocks/ERC20Mock.sol";
 import { MockV3Aggregator } from "../mocks/MockV3Aggregator.sol";
 
 import { Collatarable } from "../../src/modules/Collatarable.sol";
+import { Errors } from "../../src/libraries/Errors.sol";
 
 contract DSCEngineTest is Test {
   /*//////////////////////////////////////////////////////////////
                               MOCKS
   //////////////////////////////////////////////////////////////*/
-
   event CallateralDeposited(address indexed user, address indexed token, uint256 amount);
 
   DeployDSC public deployer;
@@ -55,28 +55,28 @@ contract DSCEngineTest is Test {
     tokenAddresses.push(weth);
     feedAddresses.push(ethUsdPriceFeed);
     feedAddresses.push(btcUsdPriceFeed);
-    vm.expectRevert(Collatarable.Collatarable__CollateralAndOraclesAddressesMustBeEqualLength.selector);
+    vm.expectRevert(Errors.DSCEngine__CollateralAndOraclesAddressesMustBeEqualLength.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
   function testRevertIfDscAddressIsZero() public {
     tokenAddresses.push(weth);
     feedAddresses.push(ethUsdPriceFeed);
-    vm.expectRevert(DSCEngine.DSCEngine__ZeroAddress.selector);
+    vm.expectRevert(Errors.DSCEngine__ZeroAddress.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(0));
   }
 
   function testRevertIfCollateralTokenIsZero() public {
     tokenAddresses.push(address(0));
     feedAddresses.push(ethUsdPriceFeed);
-    vm.expectRevert(Collatarable.Collatarable__ZeroAddress.selector);
+    vm.expectRevert(Errors.DSCEngine__ZeroAddress.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
   function testRevertIfPriceFeedIsZero() public {
     tokenAddresses.push(weth);
     feedAddresses.push(address(0));
-    vm.expectRevert(Collatarable.Collatarable__ZeroAddress.selector);
+    vm.expectRevert(Errors.DSCEngine__ZeroAddress.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
@@ -115,7 +115,7 @@ contract DSCEngineTest is Test {
   function testRevertIfCollateralZero() public {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
-    vm.expectRevert();
+    vm.expectRevert(Errors.DSCEngine__AmountLessThanOrEqualZero.selector);
     engine.depositCollateral(weth, 0);
     vm.stopPrank();
   }
@@ -123,7 +123,7 @@ contract DSCEngineTest is Test {
   function testRevertIfTokenNotAllowedToDepositCollateral() public {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
-    vm.expectRevert(Collatarable.Collatarable__WrongCollateral.selector);
+    vm.expectRevert(Errors.DSCEngine__WrongCollateral.selector);
     engine.depositCollateral(address(dsc), AMOUNT_COLLATERAL);
     vm.stopPrank();
   }
@@ -148,14 +148,14 @@ contract DSCEngineTest is Test {
   //////////////////////////////////////////////////////////////*/
   function testRevertIfMintAmountZero() public {
     vm.startPrank(USER);
-    vm.expectRevert();
+    vm.expectRevert(Errors.DSCEngine__AmountLessThanOrEqualZero.selector);
     engine.mintDsc(0);
     vm.stopPrank();
   }
 
   function testRevertMintIfHealthFactorIsBroken() public {
     vm.startPrank(USER);
-    vm.expectRevert(DSCEngine.DSCEngine__BreaksHealthFactor.selector);
+    vm.expectRevert(Errors.DSCEngine__BreaksHealthFactor.selector);
     engine.mintDsc(AMOUNT_MINT);
     vm.stopPrank();
   }
@@ -244,7 +244,7 @@ contract DSCEngineTest is Test {
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
     engine.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_MINT);
 
-    vm.expectRevert(DSCEngine.DSCEngine__BreaksHealthFactor.selector);
+    vm.expectRevert(Errors.DSCEngine__BreaksHealthFactor.selector);
     engine.redeemCollateral(weth, AMOUNT_COLLATERAL);
   }
 
@@ -307,7 +307,7 @@ contract DSCEngineTest is Test {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
     engine.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_MINT);
-    vm.expectRevert(DSCEngine.DSCEngine__HealthFactorOk.selector);
+    vm.expectRevert(Errors.DSCEngine__HealthFactorOk.selector);
     engine.liquidate(weth, USER, AMOUNT_MINT);
     vm.stopPrank();
   }

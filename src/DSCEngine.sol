@@ -6,9 +6,11 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import { DecentralizedStableCoin } from "./DecentralizedStableCoin.sol";
 import { OracleLib } from "./libraries/OracleLib.sol";
+import { Errors } from "./libraries/Errors.sol";
+import { Events } from "./libraries/Events.sol";
 
 import { Collatarable } from "./modules/Collatarable.sol";
-import { CommonModifiers } from "./modules/CommonModifiers.sol";
+import { Base } from "./modules/Base.sol";
 
 /**
  * @title DSCEngine
@@ -27,17 +29,7 @@ import { CommonModifiers } from "./modules/CommonModifiers.sol";
  *
  * @notice This contract is VERY loosely based on the MakerDAO DSS
  */
-contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
-  /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-  //////////////////////////////////////////////////////////////*/
-  error DSCEngine__TransferFailed();
-  error DSCEngine__BreaksHealthFactor();
-  error DSCEngine__MintFailed();
-  error DSCEngine__HealthFactorOk();
-  error DSCEngine__HealthFactorNotImproved();
-  error DSCEngine__ZeroAddress();
-
+contract DSCEngine is Base, ReentrancyGuard, Collatarable {
   /*//////////////////////////////////////////////////////////////
                                  STATE
     //////////////////////////////////////////////////////////////*/
@@ -56,19 +48,6 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
   DecentralizedStableCoin private immutable i_dsc;
 
   /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
-  event Liquidated(
-    address indexed liquidator,
-    address indexed liquidated,
-    address indexed collateralToken,
-    uint256 redeemed,
-    uint256 burned,
-    uint256 initialHealthFactor,
-    uint256 finalHealthFactor
-  );
-
-  /*//////////////////////////////////////////////////////////////
                                  LOGIC
   //////////////////////////////////////////////////////////////*/
 
@@ -80,7 +59,7 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
     Collatarable(_collaterals, _oracles)
   {
     if (dscAddress == address(0)) {
-      revert DSCEngine__ZeroAddress();
+      revert Errors.DSCEngine__ZeroAddress();
     }
     i_dsc = DecentralizedStableCoin(dscAddress);
   }
@@ -134,7 +113,7 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
     _revertIfHealthFactorIsBroken(msg.sender);
     bool minted = i_dsc.mint(msg.sender, _dscAmount);
     if (!minted) {
-      revert DSCEngine__MintFailed();
+      revert Errors.DSCEngine__MintFailed();
     }
   }
 
@@ -179,7 +158,7 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
   {
     uint256 startingUserHealthFactor = _healthFactor(_user);
     if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
-      revert DSCEngine__HealthFactorOk();
+      revert Errors.DSCEngine__HealthFactorOk();
     }
     (,, uint256 totalCollateralToRedeem) = estimateLiquidationProfit(_collateral, _debtToCover);
     // take collateral from "bad" user and transfer it to liquidator (with bonus)
@@ -190,11 +169,11 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
     uint256 endingUserHealthFactor = _healthFactor(_user);
 
     if (endingUserHealthFactor <= startingUserHealthFactor) {
-      revert DSCEngine__HealthFactorNotImproved();
+      revert Errors.DSCEngine__HealthFactorNotImproved();
     }
     _revertIfHealthFactorIsBroken(msg.sender);
 
-    emit Liquidated(
+    emit Events.Liquidated(
       msg.sender,
       _user,
       _collateral,
@@ -222,7 +201,7 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
     s_dscMinted[_onBehalfOf] -= _amount;
     bool success = i_dsc.transferFrom(_from, address(this), _amount);
     if (!success) {
-      revert DSCEngine__TransferFailed();
+      revert Errors.DSCEngine__TransferFailed();
     }
     i_dsc.burn(_amount);
   }
@@ -251,7 +230,7 @@ contract DSCEngine is CommonModifiers, ReentrancyGuard, Collatarable {
 
   function _revertIfHealthFactorIsBroken(address user) internal view {
     if (_healthFactor(user) < MIN_HEALTH_FACTOR) {
-      revert DSCEngine__BreaksHealthFactor();
+      revert Errors.DSCEngine__BreaksHealthFactor();
     }
   }
 
