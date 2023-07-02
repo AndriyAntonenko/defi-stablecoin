@@ -35,8 +35,8 @@ contract InvariantsTest is StdInvariant, Test {
     uint256 wethCollateral = ERC20Mock(weth).balanceOf(address(engine));
     uint256 wbtcCollateral = ERC20Mock(wbtc).balanceOf(address(engine));
 
-    uint256 wethUsdValue = engine.getUsdValue(weth, wethCollateral);
-    uint256 wbtcUsdValue = engine.getUsdValue(wbtc, wbtcCollateral);
+    uint256 wethUsdValue = engine.getCollateralUsdValue(weth, wethCollateral);
+    uint256 wbtcUsdValue = engine.getCollateralUsdValue(wbtc, wbtcCollateral);
 
     console.log("dscTotalSupply", dscTotalSupply);
     console.log("wethUsdValue", wethUsdValue);

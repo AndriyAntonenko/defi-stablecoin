@@ -27,10 +27,10 @@ contract Handler is Test {
     engine = _dscEngine;
     dsc = _dsc;
 
-    address[] memory collateralTokens = engine.getCollateralTokens();
-    weth = ERC20Mock(collateralTokens[0]);
-    wbtc = ERC20Mock(collateralTokens[1]);
-    ethUsdPriceFeed = MockV3Aggregator(engine.getCollateralPriceFeed(collateralTokens[0]));
+    address[] memory collaterals = engine.getCollaterals();
+    weth = ERC20Mock(collaterals[0]);
+    wbtc = ERC20Mock(collaterals[1]);
+    ethUsdPriceFeed = MockV3Aggregator(engine.getCollateralOracle(collaterals[0]));
 
     // setup actors
     actors = new address[](3);

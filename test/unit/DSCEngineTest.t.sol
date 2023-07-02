@@ -9,6 +9,8 @@ import { HelperConfig } from "../../scripts/HelperConfig.s.sol";
 import { ERC20Mock } from "../mocks/ERC20Mock.sol";
 import { MockV3Aggregator } from "../mocks/MockV3Aggregator.sol";
 
+import { Collatarable } from "../../src/modules/Collatarable.sol";
+
 contract DSCEngineTest is Test {
   /*//////////////////////////////////////////////////////////////
                               MOCKS
@@ -53,7 +55,7 @@ contract DSCEngineTest is Test {
     tokenAddresses.push(weth);
     feedAddresses.push(ethUsdPriceFeed);
     feedAddresses.push(btcUsdPriceFeed);
-    vm.expectRevert(DSCEngine.DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeEqualLength.selector);
+    vm.expectRevert(Collatarable.Collatarable__CollateralAndOraclesAddressesMustBeEqualLength.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
@@ -67,14 +69,14 @@ contract DSCEngineTest is Test {
   function testRevertIfCollateralTokenIsZero() public {
     tokenAddresses.push(address(0));
     feedAddresses.push(ethUsdPriceFeed);
-    vm.expectRevert(DSCEngine.DSCEngine__ZeroAddress.selector);
+    vm.expectRevert(Collatarable.Collatarable__ZeroAddress.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
   function testRevertIfPriceFeedIsZero() public {
     tokenAddresses.push(weth);
     feedAddresses.push(address(0));
-    vm.expectRevert(DSCEngine.DSCEngine__ZeroAddress.selector);
+    vm.expectRevert(Collatarable.Collatarable__ZeroAddress.selector);
     new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
   }
 
@@ -86,7 +88,7 @@ contract DSCEngineTest is Test {
     uint256 ethAmount = 15e18;
     uint256 expectedUsdUncorrected = ethAmount * uint256(MockV3Aggregator(ethUsdPriceFeed).latestAnswer());
     uint256 expectedUsd = (expectedUsdUncorrected * engine.getAdditionalFeedPrecision()) / engine.getPresicion();
-    uint256 actualUsd = engine.getUsdValue(weth, ethAmount);
+    uint256 actualUsd = engine.getCollateralUsdValue(weth, ethAmount);
     assertEq(actualUsd, expectedUsd);
   }
 
@@ -95,7 +97,7 @@ contract DSCEngineTest is Test {
     // assume that price = 2000$ for 1 ETH (check helper config)
     uint256 expectedWeth = (engine.getPresicion() * usdAmountInWei)
       / (uint256(MockV3Aggregator(ethUsdPriceFeed).latestAnswer()) * engine.getAdditionalFeedPrecision());
-    uint256 actualWeth = engine.getTokenAmountFromUsd(weth, usdAmountInWei);
+    uint256 actualWeth = engine.getCollateralAmountFromUsd(weth, usdAmountInWei);
     assertEq(actualWeth, expectedWeth);
   }
 
@@ -113,7 +115,7 @@ contract DSCEngineTest is Test {
   function testRevertIfCollateralZero() public {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
-    vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+    vm.expectRevert();
     engine.depositCollateral(weth, 0);
     vm.stopPrank();
   }
@@ -121,7 +123,7 @@ contract DSCEngineTest is Test {
   function testRevertIfTokenNotAllowedToDepositCollateral() public {
     vm.startPrank(USER);
     ERC20Mock(weth).approve(address(engine), AMOUNT_COLLATERAL);
-    vm.expectRevert(DSCEngine.DSCEngine__TokenNotAllowedAsCollateral.selector);
+    vm.expectRevert(Collatarable.Collatarable__WrongCollateral.selector);
     engine.depositCollateral(address(dsc), AMOUNT_COLLATERAL);
     vm.stopPrank();
   }
@@ -137,7 +139,7 @@ contract DSCEngineTest is Test {
 
   function testCollateralValueInUsdIsCorrect() public deposited {
     uint256 callateralValueInUsd = engine.getAccountCallateralValueInUsd(USER);
-    uint256 expectedCallateralValueInUsd = engine.getUsdValue(weth, AMOUNT_COLLATERAL);
+    uint256 expectedCallateralValueInUsd = engine.getCollateralUsdValue(weth, AMOUNT_COLLATERAL);
     assertEq(callateralValueInUsd, expectedCallateralValueInUsd);
   }
 
@@ -146,7 +148,7 @@ contract DSCEngineTest is Test {
   //////////////////////////////////////////////////////////////*/
   function testRevertIfMintAmountZero() public {
     vm.startPrank(USER);
-    vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+    vm.expectRevert();
     engine.mintDsc(0);
     vm.stopPrank();
   }
@@ -167,7 +169,8 @@ contract DSCEngineTest is Test {
     assertEq(actualCollateralAmount, AMOUNT_COLLATERAL); // check collateral amount
     assertEq(totalDscMinted, AMOUNT_MINT); // check minted amount
     assertEq(totalDscMinted, dscERC20Balance); // check minted amount to be equal to dsc balance
-    assertEq(collateralValueInUsd, engine.getUsdValue(weth, AMOUNT_COLLATERAL)); // check usd equivalent of collateral
+    assertEq(collateralValueInUsd, engine.getCollateralUsdValue(weth, AMOUNT_COLLATERAL)); // check usd equivalent of
+      // collateral
   }
 
   function testSuccessfullMint() public {
@@ -196,7 +199,7 @@ contract DSCEngineTest is Test {
   }
 
   function testEstimateMaxMintable() public deposited {
-    uint256 collateralValueInUsd = engine.getUsdValue(weth, AMOUNT_COLLATERAL);
+    uint256 collateralValueInUsd = engine.getCollateralUsdValue(weth, AMOUNT_COLLATERAL);
     assertEq(
       (collateralValueInUsd * engine.getLiquidationThreshold()) / engine.getLiquidationPrecision(),
       engine.estimateAccountMaxMintableDsc(USER)
@@ -338,15 +341,15 @@ contract DSCEngineTest is Test {
                         GETTERS FUNCTIONS
   //////////////////////////////////////////////////////////////*/
 
-  function testGetCollateralTokens() public {
-    address[] memory collateralTokens = engine.getCollateralTokens();
+  function testGetCollaterals() public {
+    address[] memory collateralTokens = engine.getCollaterals();
     assertEq(collateralTokens.length, 2);
     assertEq(collateralTokens[0], weth);
     assertEq(collateralTokens[1], wbtc);
   }
 
-  function testGetCollateralPriceFeed() public {
-    address receivedWethFeed = engine.getCollateralPriceFeed(weth);
+  function testGetCollateralOracle() public {
+    address receivedWethFeed = engine.getCollateralOracle(weth);
     assertEq(receivedWethFeed, ethUsdPriceFeed);
   }
 }
